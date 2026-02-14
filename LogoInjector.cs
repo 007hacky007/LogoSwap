@@ -66,14 +66,16 @@ public class LogoInjector : IHostedService
             el.style.backgroundImage = 'url(' + customLogoUrl + ')';
             el.style.backgroundSize = 'contain';
             el.style.backgroundRepeat = 'no-repeat';
+            el.style.backgroundColor = 'transparent';
         });
-        
+
         // Sidebar/drawer logo
         document.querySelectorAll('.mainDrawer .logoImage, .navDrawerLogo, .adminDrawerLogo').forEach(function(el) {
             el.style.backgroundImage = 'url(' + customLogoUrl + ')';
             el.style.backgroundSize = 'contain';
             el.style.backgroundRepeat = 'no-repeat';
             el.style.backgroundPosition = 'center';
+            el.style.backgroundColor = 'transparent';
         });
         
         // Handle any img elements with logo/banner in src

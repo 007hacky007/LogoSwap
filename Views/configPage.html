@@ -31,10 +31,8 @@
                             <div id="selectedFileName" style="margin-top: 0.5em; color: #888;"></div>
                         </div>
 
-                        <div style="margin-top: 1em;">
-                            <button type="button" id="uploadBtn" is="emby-button" class="raised button-submit block" disabled>
-                                <span>Upload Logo</span>
-                            </button>
+                        <div id="uploadProgress" style="margin-top: 0.5em; display: none;">
+                            <span style="color: #2196f3;">Uploading...</span>
                         </div>
                     </div>
 
@@ -93,10 +91,14 @@
                 var selectedFile = null;
                 var INJECTION_MARKER = '/* LogoSwap */';
                 var END_MARKER = '/* END LogoSwap */';
+                var initialized = false;
 
                 function init() {
+                    if (initialized) return;
+                    initialized = true;
+
                     var page = document.querySelector('#LogoSwapConfigPage');
-                    
+
                     page.querySelector('#selectFileBtn').addEventListener('click', function() {
                         page.querySelector('#logoFile').click();
                     });
@@ -105,13 +107,8 @@
                         selectedFile = e.target.files[0];
                         if (selectedFile) {
                             page.querySelector('#selectedFileName').textContent = 'Selected: ' + selectedFile.name;
-                            page.querySelector('#uploadBtn').disabled = false;
+                            uploadLogo(page);
                         }
-                    });
-
-                    page.querySelector('#uploadBtn').addEventListener('click', function() {
-                        if (!selectedFile) return;
-                        uploadLogo(page);
                     });
 
                     page.querySelector('#deleteBtn').addEventListener('click', function() {
@@ -172,9 +169,11 @@
 
                 function uploadLogo(page) {
                     var statusEl = page.querySelector('#statusMessage');
-                    var uploadBtn = page.querySelector('#uploadBtn');
-                    
-                    uploadBtn.disabled = true;
+                    var progressEl = page.querySelector('#uploadProgress');
+                    var selectBtn = page.querySelector('#selectFileBtn');
+
+                    progressEl.style.display = 'block';
+                    selectBtn.disabled = true;
                     statusEl.innerHTML = '<span style="color: #2196f3;">Uploading...</span>';
 
                     var formData = new FormData();
@@ -198,12 +197,14 @@
                         selectedFile = null;
                         page.querySelector('#selectedFileName').textContent = '';
                         page.querySelector('#logoFile').value = '';
-                        uploadBtn.disabled = true;
+                        progressEl.style.display = 'none';
+                        selectBtn.disabled = false;
                         checkStatus(page);
                     })
                     .catch(function(err) {
                         statusEl.innerHTML = '<span style="color: #ff5722;">✗ Error: ' + err.message + '</span>';
-                        uploadBtn.disabled = false;
+                        progressEl.style.display = 'none';
+                        selectBtn.disabled = false;
                     });
                 }
 
@@ -286,6 +287,7 @@
                                 '  background-image: url("' + logoUrl + '") !important;\n' +
                                 '  background-size: contain !important;\n' +
                                 '  background-repeat: no-repeat !important;\n' +
+                                '  background-color: transparent !important;\n' +
                                 '}\n' +
                                 'img[src*="banner-light"], img[src*="banner-dark"],\n' +
                                 'img[src*="icon-transparent"], .imgLogoIcon {\n' +
