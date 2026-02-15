@@ -33,11 +33,31 @@ jobs:
 
       - name: Package
         run: |
-          mkdir -p release/LogoSwap
-          cp bin/Release/net9.0/LogoSwap.dll release/LogoSwap/
-          cp bin/Release/net9.0/image.png release/LogoSwap/
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          REPO="${{ github.repository }}"
+          mkdir -p release
+
+          cp bin/Release/net9.0/LogoSwap.dll release/
+          cp bin/Release/net9.0/image.png release/
+
+          cat > release/meta.json << METAEOF
+          {
+            "guid": "19b92b8c-3926-4449-8432-10d30ab75a05",
+            "name": "LogoSwap",
+            "description": "Swap the default Jellyfin logo with your own custom branding.",
+            "overview": "Upload a custom logo to replace Jellyfin branding throughout the interface.",
+            "owner": "${REPO%%/*}",
+            "category": "General",
+            "version": "${VERSION}",
+            "targetAbi": "10.11.0.0",
+            "status": "Active",
+            "autoUpdate": true,
+            "imagePath": "image.png"
+          }
+          METAEOF
+
           cd release
-          zip -r ../LogoSwap_${{ steps.version.outputs.VERSION }}.zip LogoSwap/
+          zip -r ../LogoSwap_${VERSION}.zip LogoSwap.dll image.png meta.json
 
       - name: Compute checksum
         id: checksum
@@ -61,11 +81,17 @@ jobs:
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           REPO="${{ github.repository }}"
 
+          OWNER="${REPO%%/*}"
+
           jq --arg ver "$VERSION" \
              --arg cs "$CHECKSUM" \
              --arg ts "$TIMESTAMP" \
              --arg url "https://github.com/${REPO}/releases/download/v${VERSION}/LogoSwap_${VERSION}.zip" \
-             '.[0].versions = [{
+             --arg owner "$OWNER" \
+             --arg imgUrl "https://raw.githubusercontent.com/${REPO}/main/static/icon.png" \
+             '.[0].owner = $owner |
+              .[0].imageUrl = $imgUrl |
+              .[0].versions = [{
                 version: $ver,
                 changelog: "See release notes.",
                 targetAbi: "10.11.0.0",
