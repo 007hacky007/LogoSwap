@@ -29,7 +29,7 @@ jobs:
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore /p:Version=${{ steps.version.outputs.VERSION }} /p:AssemblyVersion=${{ steps.version.outputs.VERSION }}.0 /p:FileVersion=${{ steps.version.outputs.VERSION }}.0
+        run: dotnet build --configuration Release --no-restore /p:Version=${{ steps.version.outputs.VERSION }}.0 /p:AssemblyVersion=${{ steps.version.outputs.VERSION }}.0 /p:FileVersion=${{ steps.version.outputs.VERSION }}.0
 
       - name: Package
         run: |
@@ -48,7 +48,7 @@ jobs:
             "overview": "Upload a custom logo to replace Jellyfin branding throughout the interface.",
             "owner": "${REPO%%/*}",
             "category": "General",
-            "version": "${VERSION}",
+            "version": "${VERSION}.0",
             "targetAbi": "10.11.0.0",
             "status": "Active",
             "autoUpdate": true,
@@ -83,7 +83,7 @@ jobs:
 
           OWNER="${REPO%%/*}"
 
-          jq --arg ver "$VERSION" \
+          jq --arg ver "${VERSION}.0" \
              --arg cs "$CHECKSUM" \
              --arg ts "$TIMESTAMP" \
              --arg url "https://github.com/${REPO}/releases/download/v${VERSION}/LogoSwap_${VERSION}.zip" \
