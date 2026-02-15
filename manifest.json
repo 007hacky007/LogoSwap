@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/007hacky007/LogoSwap/main/static/icon.png",
     "versions": [
       {
+        "version": "1.2.2.0",
+        "changelog": "See release notes.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/007hacky007/LogoSwap/releases/download/v1.2.2/LogoSwap_1.2.2.zip",
+        "checksum": "a824e1145131a94ccee9dac748b94e37",
+        "timestamp": "2026-02-15T00:59:56Z"
+      },
+      {
         "version": "1.2.1",
         "changelog": "See release notes.",
         "targetAbi": "10.11.0.0",
