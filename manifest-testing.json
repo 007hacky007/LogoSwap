@@ -1,0 +1,21 @@
+[
+  {
+    "guid": "19b92b8c-3926-4449-8432-10d30ab75a05",
+    "name": "LogoSwap",
+    "description": "Swap the default Jellyfin logo with your own custom branding.",
+    "overview": "Upload a custom logo to replace Jellyfin branding throughout the interface.",
+    "owner": "007hacky007",
+    "category": "General",
+    "imageUrl": "https://raw.githubusercontent.com/007hacky007/LogoSwap/main/static/icon.png",
+    "versions": [
+      {
+        "version": "1.3.0.0",
+        "changelog": "See release notes.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/007hacky007/LogoSwap/releases/download/v1.3.0-rc1/LogoSwap_1.3.0-rc1.zip",
+        "checksum": "46ae972acd5341551f706d138b6fb15d",
+        "timestamp": "2026-03-10T15:28:48Z"
+      }
+    ]
+  }
+]
