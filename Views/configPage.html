@@ -50,6 +50,39 @@
 
                     <div class="verticalSection">
                         <div class="sectionTitleContainer">
+                            <h3 class="sectionTitle">Custom Favicon (Optional)</h3>
+                        </div>
+                        <div class="fieldDescription">
+                            Upload a custom favicon to replace the Jellyfin icon in browser tabs. Supports PNG, SVG, and ICO formats.
+                        </div>
+
+                        <div class="inputContainer" style="margin-top: 1em;">
+                            <input type="file" id="faviconFile" accept="image/png,image/svg+xml,image/x-icon,.ico,.svg,.png" style="display: none;" />
+                            <button type="button" id="selectFaviconBtn" is="emby-button" class="raised button-submit block">
+                                <span>Select Favicon Image</span>
+                            </button>
+                            <div id="selectedFaviconName" style="margin-top: 0.5em; color: #888;"></div>
+                        </div>
+
+                        <div id="faviconUploadProgress" style="margin-top: 0.5em; display: none;">
+                            <span style="color: #2196f3;">Uploading...</span>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection" id="currentFaviconSection" style="display: none;">
+                        <div class="sectionTitleContainer">
+                            <h3 class="sectionTitle">Current Favicon</h3>
+                        </div>
+                        <div style="background: #1a1a1a; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 1em;">
+                            <img id="currentFaviconPreview" src="" alt="Current Favicon" style="max-width: 64px; max-height: 64px; object-fit: contain;" />
+                        </div>
+                        <button type="button" id="deleteFaviconBtn" is="emby-button" class="raised button-cancel block">
+                            <span>Delete Favicon (Restore Default)</span>
+                        </button>
+                    </div>
+
+                    <div class="verticalSection">
+                        <div class="sectionTitleContainer">
                             <h3 class="sectionTitle">Apply Logo to Jellyfin</h3>
                         </div>
                         <div class="fieldDescription">
@@ -89,6 +122,7 @@
                 'use strict';
 
                 var selectedFile = null;
+                var selectedFaviconFile = null;
                 var INJECTION_MARKER = '/* LogoSwap */';
                 var END_MARKER = '/* END LogoSwap */';
                 var initialized = false;
@@ -115,6 +149,22 @@
                         deleteLogo(page);
                     });
 
+                    page.querySelector('#selectFaviconBtn').addEventListener('click', function() {
+                        page.querySelector('#faviconFile').click();
+                    });
+
+                    page.querySelector('#faviconFile').addEventListener('change', function(e) {
+                        selectedFaviconFile = e.target.files[0];
+                        if (selectedFaviconFile) {
+                            page.querySelector('#selectedFaviconName').textContent = 'Selected: ' + selectedFaviconFile.name;
+                            uploadFavicon(page);
+                        }
+                    });
+
+                    page.querySelector('#deleteFaviconBtn').addEventListener('click', function() {
+                        deleteFavicon(page);
+                    });
+
                     page.querySelector('#applyBrandingBtn').addEventListener('click', function() {
                         applyBranding(page);
                     });
@@ -124,6 +174,108 @@
                     });
 
                     checkStatus(page);
+                    checkFaviconStatus(page);
+                }
+
+                function checkFaviconStatus(page) {
+                    var faviconSection = page.querySelector('#currentFaviconSection');
+                    var previewImg = page.querySelector('#currentFaviconPreview');
+
+                    fetch('/logoswap/favicon/status', { credentials: 'include' })
+                    .then(function(response) { return response.json(); })
+                    .then(function(data) {
+                        if (data.hasFavicon) {
+                            faviconSection.style.display = 'block';
+                            previewImg.src = data.faviconUrl + '?t=' + Date.now();
+                        } else {
+                            faviconSection.style.display = 'none';
+                        }
+                    })
+                    .catch(function() {});
+                }
+
+                function uploadFavicon(page) {
+                    var statusEl = page.querySelector('#statusMessage');
+                    var progressEl = page.querySelector('#faviconUploadProgress');
+                    var selectBtn = page.querySelector('#selectFaviconBtn');
+
+                    progressEl.style.display = 'block';
+                    selectBtn.disabled = true;
+
+                    var formData = new FormData();
+                    formData.append('file', selectedFaviconFile);
+
+                    fetch('/logoswap/favicon/upload', {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'include'
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            return response.text().then(function(text) {
+                                throw new Error(text || 'Upload failed');
+                            });
+                        }
+                        return response.text();
+                    })
+                    .then(function(result) {
+                        statusEl.textContent = '';
+                        var span = document.createElement('span');
+                        span.style.color = '#4caf50';
+                        span.textContent = '\u2713 ' + result;
+                        statusEl.appendChild(span);
+                        selectedFaviconFile = null;
+                        page.querySelector('#selectedFaviconName').textContent = '';
+                        page.querySelector('#faviconFile').value = '';
+                        progressEl.style.display = 'none';
+                        selectBtn.disabled = false;
+                        checkFaviconStatus(page);
+                    })
+                    .catch(function(err) {
+                        statusEl.textContent = '';
+                        var span = document.createElement('span');
+                        span.style.color = '#ff5722';
+                        span.textContent = '\u2717 Error: ' + err.message;
+                        statusEl.appendChild(span);
+                        progressEl.style.display = 'none';
+                        selectBtn.disabled = false;
+                    });
+                }
+
+                function deleteFavicon(page) {
+                    var statusEl = page.querySelector('#statusMessage');
+
+                    if (!confirm('Delete the custom favicon and restore the default Jellyfin icon?')) {
+                        return;
+                    }
+
+                    fetch('/logoswap/favicon/delete', {
+                        method: 'DELETE',
+                        credentials: 'include'
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            return response.text().then(function(text) {
+                                throw new Error(text || 'Delete failed');
+                            });
+                        }
+                        return response.text();
+                    })
+                    .then(function(result) {
+                        statusEl.textContent = '';
+                        var span = document.createElement('span');
+                        span.style.color = '#4caf50';
+                        span.textContent = '\u2713 ' + result;
+                        statusEl.appendChild(span);
+                        checkFaviconStatus(page);
+                    })
+                    .catch(function(err) {
+                        statusEl.textContent = '';
+                        var span = document.createElement('span');
+                        span.style.color = '#ff5722';
+                        span.textContent = '\u2717 Error: ' + err.message;
+                        statusEl.appendChild(span);
+                    });
                 }
 
                 function checkStatus(page) {

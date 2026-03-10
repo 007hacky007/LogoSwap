@@ -126,6 +126,27 @@ public class LogoInjector : IHostedService
     
     // Periodic fallback
     setInterval(replaceLogos, 2000);
+
+    // Favicon replacement
+    fetch('/logoswap/favicon/status', { credentials: 'include' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.hasFavicon) return;
+        var faviconUrl = data.faviconUrl + '?v=' + new Date().getTime();
+        function replaceFavicons() {
+            document.querySelectorAll('link[rel*=""icon""]').forEach(function(link) {
+                link.href = faviconUrl;
+            });
+        }
+        replaceFavicons();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', replaceFavicons);
+        }
+        ['viewshow', 'pageshow'].forEach(function(evt) {
+            document.addEventListener(evt, function() { setTimeout(replaceFavicons, 100); });
+        });
+    })
+    .catch(function() {});
 })();
 /* END LogoSwap */";
     }
