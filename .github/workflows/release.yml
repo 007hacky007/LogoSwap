@@ -23,17 +23,27 @@ jobs:
 
       - name: Get version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          FULL_VERSION="${GITHUB_REF_NAME#v}"
+          BASE_VERSION="${FULL_VERSION%%-*}"
+          echo "VERSION=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "BASE_VERSION=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+          if [[ "$FULL_VERSION" == *-* ]]; then
+            echo "PRERELEASE=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "PRERELEASE=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Restore dependencies
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore /p:Version=${{ steps.version.outputs.VERSION }}.0 /p:AssemblyVersion=${{ steps.version.outputs.VERSION }}.0 /p:FileVersion=${{ steps.version.outputs.VERSION }}.0
+        run: dotnet build --configuration Release --no-restore /p:Version=${{ steps.version.outputs.BASE_VERSION }}.0 /p:AssemblyVersion=${{ steps.version.outputs.BASE_VERSION }}.0 /p:FileVersion=${{ steps.version.outputs.BASE_VERSION }}.0
 
       - name: Package
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
+          BASE_VERSION="${{ steps.version.outputs.BASE_VERSION }}"
           REPO="${{ github.repository }}"
           mkdir -p release
 
@@ -48,7 +58,7 @@ jobs:
             "overview": "Upload a custom logo to replace Jellyfin branding throughout the interface.",
             "owner": "${REPO%%/*}",
             "category": "General",
-            "version": "${VERSION}.0",
+            "version": "${BASE_VERSION}.0",
             "targetAbi": "10.11.0.0",
             "status": "Active",
             "autoUpdate": true,
@@ -68,6 +78,7 @@ jobs:
         with:
           files: LogoSwap_${{ steps.version.outputs.VERSION }}.zip
           generate_release_notes: true
+          prerelease: ${{ steps.version.outputs.PRERELEASE == 'true' }}
 
       - name: Update manifest and push to main
         run: |
@@ -77,13 +88,27 @@ jobs:
           git checkout main
 
           VERSION="${{ steps.version.outputs.VERSION }}"
+          BASE_VERSION="${{ steps.version.outputs.BASE_VERSION }}"
+          PRERELEASE="${{ steps.version.outputs.PRERELEASE }}"
           CHECKSUM="${{ steps.checksum.outputs.MD5 }}"
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           REPO="${{ github.repository }}"
-
           OWNER="${REPO%%/*}"
 
-          jq --arg ver "${VERSION}.0" \
+          if [ "$PRERELEASE" = "true" ]; then
+            MANIFEST_FILE="manifest-testing.json"
+          else
+            MANIFEST_FILE="manifest.json"
+          fi
+
+          # Ensure manifest file exists with base structure
+          if [ ! -f "$MANIFEST_FILE" ]; then
+            cp manifest.json "$MANIFEST_FILE"
+            # Clear versions array for testing manifest
+            jq '.[0].versions = []' "$MANIFEST_FILE" > tmp.json && mv tmp.json "$MANIFEST_FILE"
+          fi
+
+          jq --arg ver "${BASE_VERSION}.0" \
              --arg cs "$CHECKSUM" \
              --arg ts "$TIMESTAMP" \
              --arg url "https://github.com/${REPO}/releases/download/v${VERSION}/LogoSwap_${VERSION}.zip" \
@@ -98,9 +123,9 @@ jobs:
                 sourceUrl: $url,
                 checksum: $cs,
                 timestamp: $ts
-              }] + .[0].versions' manifest.json > manifest_tmp.json
-          mv manifest_tmp.json manifest.json
+              }] + .[0].versions' "$MANIFEST_FILE" > manifest_tmp.json
+          mv manifest_tmp.json "$MANIFEST_FILE"
 
-          git add manifest.json
-          git commit -m "Update manifest for v${{ steps.version.outputs.VERSION }}"
+          git add "$MANIFEST_FILE"
+          git commit -m "Update ${MANIFEST_FILE} for v${VERSION}"
           git push origin main
