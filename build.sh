@@ -75,8 +75,9 @@ TEMP_DIR=$(mktemp -d)
 PLUGIN_DIR="$TEMP_DIR/$PROJECT_NAME"
 mkdir -p "$PLUGIN_DIR"
 
-# Copy the DLL to the package directory
+# Copy the DLL and plugin image to the package directory
 cp "./bin/$BUILD_CONFIG/net9.0/$PROJECT_NAME.dll" "$PLUGIN_DIR/"
+cp "./bin/$BUILD_CONFIG/net9.0/image.png" "$PLUGIN_DIR/image.png"
 
 # Create the ZIP file
 ZIP_FILE="$OUTPUT_DIR/${PROJECT_NAME}_${VERSION}.zip"
@@ -117,7 +118,7 @@ echo -e "${YELLOW}Update your manifest.json with:${NC}"
 echo ""
 cat << EOF
 {
-  "version": "$VERSION",
+  "version": "${VERSION}.0",
   "changelog": "Your changelog here",
   "targetAbi": "10.11.0.0",
   "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/$VERSION/${PROJECT_NAME}_${VERSION}.zip",
