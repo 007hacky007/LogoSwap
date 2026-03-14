@@ -91,37 +91,38 @@
                 var selectedFile = null;
                 var INJECTION_MARKER = '/* LogoSwap */';
                 var END_MARKER = '/* END LogoSwap */';
-                var initialized = false;
+                var listenersAttached = false;
 
                 function init() {
-                    if (initialized) return;
-                    initialized = true;
-
                     var page = document.querySelector('#LogoSwapConfigPage');
 
-                    page.querySelector('#selectFileBtn').addEventListener('click', function() {
-                        page.querySelector('#logoFile').click();
-                    });
+                    if (!listenersAttached) {
+                        listenersAttached = true;
 
-                    page.querySelector('#logoFile').addEventListener('change', function(e) {
-                        selectedFile = e.target.files[0];
-                        if (selectedFile) {
-                            page.querySelector('#selectedFileName').textContent = 'Selected: ' + selectedFile.name;
-                            uploadLogo(page);
-                        }
-                    });
+                        page.querySelector('#selectFileBtn').addEventListener('click', function() {
+                            page.querySelector('#logoFile').click();
+                        });
 
-                    page.querySelector('#deleteBtn').addEventListener('click', function() {
-                        deleteLogo(page);
-                    });
+                        page.querySelector('#logoFile').addEventListener('change', function(e) {
+                            selectedFile = e.target.files[0];
+                            if (selectedFile) {
+                                page.querySelector('#selectedFileName').textContent = 'Selected: ' + selectedFile.name;
+                                uploadLogo(page);
+                            }
+                        });
 
-                    page.querySelector('#applyBrandingBtn').addEventListener('click', function() {
-                        applyBranding(page);
-                    });
+                        page.querySelector('#deleteBtn').addEventListener('click', function() {
+                            deleteLogo(page);
+                        });
 
-                    page.querySelector('#removeBrandingBtn').addEventListener('click', function() {
-                        removeBranding(page);
-                    });
+                        page.querySelector('#applyBrandingBtn').addEventListener('click', function() {
+                            applyBranding(page);
+                        });
+
+                        page.querySelector('#removeBrandingBtn').addEventListener('click', function() {
+                            removeBranding(page);
+                        });
+                    }
 
                     checkStatus(page);
                 }
