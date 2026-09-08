@@ -81,6 +81,9 @@ Your custom logo will now appear across the main Jellyfin interface.
 | `/logoswap/delete` | DELETE | Delete the uploaded logo |
 | `/logoswap/status` | GET | Check if a logo is configured |
 
+`upload` and `delete` require an authenticated administrator. `image` is
+anonymous, because the branding CSS fetches it without an auth header.
+
 ---
 
 ## How It Works
