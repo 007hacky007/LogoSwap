@@ -208,6 +208,7 @@
 
                     fetch('/logoswap/favicon/upload', {
                         method: 'POST',
+                        headers: { 'Authorization': 'MediaBrowser Token="' + ApiClient.accessToken() + '"' },
                         body: formData,
                         credentials: 'include'
                     })
@@ -252,6 +253,7 @@
 
                     fetch('/logoswap/favicon/delete', {
                         method: 'DELETE',
+                        headers: { 'Authorization': 'MediaBrowser Token="' + ApiClient.accessToken() + '"' },
                         credentials: 'include'
                     })
                     .then(function(response) {

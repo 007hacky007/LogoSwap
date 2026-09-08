@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using MediaBrowser.Common.Configuration;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -193,13 +194,10 @@ public class LogoController : ControllerBase
         return Content(LogoInjector.GetInjectionScript(), "application/javascript");
     }
 
-    private static readonly Dictionary<string, string> AllowedFaviconTypes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { "image/png", ".png" },
-        { "image/svg+xml", ".svg" },
-        { "image/x-icon", ".ico" },
-        { "image/vnd.microsoft.icon", ".ico" },
-    };
+    private const long MaxFaviconBytes = 512 * 1024;
+
+    private static readonly byte[] PngSignature = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+    private static readonly byte[] IcoSignature = { 0x00, 0x00, 0x01, 0x00 };
 
     private static readonly Dictionary<string, string> FaviconExtensionToMime = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -217,8 +215,11 @@ public class LogoController : ControllerBase
     /// <response code="500">Error saving file.</response>
     /// <returns>A status message.</returns>
     [HttpPost("favicon/upload")]
+    [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<string>> UploadFavicon([Required] IFormFile file)
     {
@@ -227,7 +228,18 @@ public class LogoController : ControllerBase
             return BadRequest("No file uploaded.");
         }
 
-        if (!AllowedFaviconTypes.TryGetValue(file.ContentType, out var extension))
+        if (file.Length > MaxFaviconBytes)
+        {
+            return BadRequest("Favicon must be 512 KiB or smaller.");
+        }
+
+        string? extension;
+        await using (var probe = file.OpenReadStream())
+        {
+            extension = await DetectFaviconExtensionAsync(probe).ConfigureAwait(false);
+        }
+
+        if (extension == null)
         {
             return BadRequest("Only PNG, SVG, and ICO files are accepted.");
         }
@@ -301,6 +313,13 @@ public class LogoController : ControllerBase
         var ext = Path.GetExtension(faviconPath);
         var contentType = FaviconExtensionToMime.TryGetValue(ext, out var mime) ? mime : "application/octet-stream";
 
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        if (ext.Equals(".svg", StringComparison.OrdinalIgnoreCase))
+        {
+            // Never let an uploaded SVG run script if someone opens it directly.
+            Response.Headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+        }
+
         var fileStream = System.IO.File.OpenRead(faviconPath);
         return File(fileStream, contentType);
     }
@@ -312,7 +331,10 @@ public class LogoController : ControllerBase
     /// <response code="404">No custom favicon found.</response>
     /// <returns>A status message.</returns>
     [HttpDelete("favicon/delete")]
+    [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult DeleteFavicon()
     {
@@ -356,5 +378,49 @@ public class LogoController : ControllerBase
         var hasFavicon = !string.IsNullOrEmpty(faviconPath) && System.IO.File.Exists(faviconPath);
 
         return Ok(new { hasFavicon, faviconUrl = hasFavicon ? "/logoswap/favicon/image" : null });
+    }
+
+    /// <summary>
+    /// Determines the favicon file extension from the actual file content rather than the declared content type.
+    /// </summary>
+    /// <param name="stream">The uploaded file stream.</param>
+    /// <returns>".png", ".ico" or ".svg", or null if the content is not a recognised favicon format.</returns>
+    private static async Task<string?> DetectFaviconExtensionAsync(Stream stream)
+    {
+        var header = new byte[1024];
+        var read = 0;
+        while (read < header.Length)
+        {
+            var n = await stream.ReadAsync(header.AsMemory(read, header.Length - read)).ConfigureAwait(false);
+            if (n == 0)
+            {
+                break;
+            }
+
+            read += n;
+        }
+
+        if (read >= PngSignature.Length && header.AsSpan(0, PngSignature.Length).SequenceEqual(PngSignature))
+        {
+            return ".png";
+        }
+
+        if (read >= IcoSignature.Length && header.AsSpan(0, IcoSignature.Length).SequenceEqual(IcoSignature))
+        {
+            return ".ico";
+        }
+
+        // SVG: text starting (after optional BOM and whitespace) with an XML declaration, doctype, comment or <svg root.
+        var text = System.Text.Encoding.UTF8.GetString(header, 0, read).TrimStart('\uFEFF', ' ', '\t', '\r', '\n');
+        if ((text.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase)
+             || text.StartsWith("<!DOCTYPE svg", StringComparison.OrdinalIgnoreCase)
+             || text.StartsWith("<!--", StringComparison.Ordinal)
+             || text.StartsWith("<svg", StringComparison.OrdinalIgnoreCase))
+            && text.Contains("<svg", StringComparison.OrdinalIgnoreCase))
+        {
+            return ".svg";
+        }
+
+        return null;
     }
 }
