@@ -1,0 +1,163 @@
+name: Release Plugin
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+      - '[0-9]*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Both SDKs, so the workflow builds the project whichever Jellyfin ABI
+      # it currently targets (10.11 is .NET 9, 12.0 is .NET 10).
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Get version from tag
+        id: version
+        run: |
+          FULL_VERSION="${GITHUB_REF_NAME#v}"
+          BASE_VERSION="${FULL_VERSION%%-*}"
+          echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "VERSION=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "BASE_VERSION=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+          if [[ "$FULL_VERSION" == *-* ]]; then
+            echo "PRERELEASE=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "PRERELEASE=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore /p:Version=${{ steps.version.outputs.BASE_VERSION }}.0 /p:AssemblyVersion=${{ steps.version.outputs.BASE_VERSION }}.0 /p:FileVersion=${{ steps.version.outputs.BASE_VERSION }}.0
+
+      - name: Package
+        id: package
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          BASE_VERSION="${{ steps.version.outputs.BASE_VERSION }}"
+          REPO="${{ github.repository }}"
+          mkdir -p release
+
+          # Jellyfin ships one DLL per server ABI (10.11 is .NET 9, 12.0 is
+          # .NET 10). Read the frameworks and their ABIs out of the project so
+          # this does not need editing on the next bump.
+          TARGET_FRAMEWORKS=$(dotnet msbuild LogoSwap.csproj -getProperty:TargetFrameworks | tr ';' ' ')
+          echo "[]" > entries.json
+
+          for TFM in $TARGET_FRAMEWORKS; do
+            TARGET_ABI="$(dotnet msbuild LogoSwap.csproj -p:TargetFramework="$TFM" -getItem:PackageReference \
+              | jq -r '.Items.PackageReference[] | select(.Identity=="Jellyfin.Controller") | .Version').0"
+            # 10.11.0.0 -> jf10.11, 12.0.0.0 -> jf12.0
+            LABEL="jf$(echo "$TARGET_ABI" | cut -d. -f1-2)"
+            ZIP="LogoSwap_${VERSION}_${LABEL}.zip"
+
+            echo "Packaging $TFM as $ZIP (targetAbi $TARGET_ABI)"
+
+            rm -rf release && mkdir -p release
+            cp "bin/Release/${TFM}/LogoSwap.dll" release/
+            cp "bin/Release/${TFM}/image.png" release/
+
+            cat > release/meta.json << METAEOF
+          {
+            "guid": "19b92b8c-3926-4449-8432-10d30ab75a05",
+            "name": "LogoSwap",
+            "description": "Swap the default Jellyfin logo with your own custom branding.",
+            "overview": "Upload a custom logo to replace Jellyfin branding throughout the interface.",
+            "owner": "${REPO%%/*}",
+            "category": "General",
+            "version": "${BASE_VERSION}.0",
+            "targetAbi": "${TARGET_ABI}",
+            "status": "Active",
+            "autoUpdate": true,
+            "imagePath": "image.png"
+          }
+          METAEOF
+
+            (cd release && zip -rq "../${ZIP}" LogoSwap.dll image.png meta.json)
+
+            jq --arg abi "$TARGET_ABI" \
+               --arg zip "$ZIP" \
+               --arg cs "$(md5sum "$ZIP" | awk '{print $1}')" \
+               '. + [{targetAbi: $abi, zip: $zip, checksum: $cs}]' entries.json > entries_tmp.json
+            mv entries_tmp.json entries.json
+          done
+
+          # Jellyfin installs the first manifest entry whose targetAbi is <= the
+          # server version, and equal version numbers keep manifest order, so the
+          # highest ABI has to come first.
+          jq -c 'sort_by(.targetAbi | split(".") | map(tonumber)) | reverse' entries.json > entries_sorted.json
+          mv entries_sorted.json entries.json
+          echo "ENTRIES=$(cat entries.json)" >> "$GITHUB_OUTPUT"
+          cat entries.json
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: LogoSwap_${{ steps.version.outputs.VERSION }}_*.zip
+          generate_release_notes: true
+          prerelease: ${{ steps.version.outputs.PRERELEASE == 'true' }}
+
+      - name: Update manifest and push to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+
+          TAG="${{ steps.version.outputs.TAG }}"
+          BASE_VERSION="${{ steps.version.outputs.BASE_VERSION }}"
+          PRERELEASE="${{ steps.version.outputs.PRERELEASE }}"
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          REPO="${{ github.repository }}"
+          OWNER="${REPO%%/*}"
+
+          if [ "$PRERELEASE" = "true" ]; then
+            MANIFEST_FILE="manifest-testing.json"
+          else
+            MANIFEST_FILE="manifest.json"
+          fi
+
+          # Ensure manifest file exists with base structure
+          if [ ! -f "$MANIFEST_FILE" ]; then
+            cp manifest.json "$MANIFEST_FILE"
+            # Clear versions array for testing manifest
+            jq '.[0].versions = []' "$MANIFEST_FILE" > tmp.json && mv tmp.json "$MANIFEST_FILE"
+          fi
+
+          jq --arg ver "${BASE_VERSION}.0" \
+             --arg ts "$TIMESTAMP" \
+             --arg base "https://github.com/${REPO}/releases/download/${TAG}" \
+             --arg owner "$OWNER" \
+             --arg imgUrl "https://raw.githubusercontent.com/${REPO}/main/static/icon.png" \
+             --argjson entries '${{ steps.package.outputs.ENTRIES }}' \
+             '.[0].owner = $owner |
+              .[0].imageUrl = $imgUrl |
+              .[0].versions = ($entries | map({
+                version: $ver,
+                changelog: "See release notes.",
+                targetAbi: .targetAbi,
+                sourceUrl: ($base + "/" + .zip),
+                checksum: .checksum,
+                timestamp: $ts
+              })) + .[0].versions' "$MANIFEST_FILE" > manifest_tmp.json
+          mv manifest_tmp.json "$MANIFEST_FILE"
+
+          git add "$MANIFEST_FILE"
+          git commit -m "Update ${MANIFEST_FILE} for ${TAG}"
+          git push origin main
