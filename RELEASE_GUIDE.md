@@ -6,7 +6,7 @@ Complete guide for building and shipping the LogoSwap plugin.
 
 ## Prerequisites
 
-- [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (builds both target frameworks)
 - Git (for tagging releases)
 - GitHub account (for hosting releases)
 
@@ -80,7 +80,7 @@ The build script outputs the exact JSON to add. Update `manifest.json`:
       {
         "version": "1.2.0",
         "changelog": "New feature: Added awesome thing",
-        "targetAbi": "10.11.0.0",
+        "targetAbi": "12.0.0.0"   // one entry per supported ABI, highest first,
         "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/1.2.0/LogoSwap_1.2.0.zip",
         "checksum": "abc123def456...",
         "timestamp": "2025-11-25T12:00:00Z"
@@ -88,7 +88,7 @@ The build script outputs the exact JSON to add. Update `manifest.json`:
       {
         "version": "1.0.0",
         "changelog": "Initial release.",
-        "targetAbi": "10.11.0.0",
+        "targetAbi": "12.0.0.0"   // one entry per supported ABI, highest first,
         "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/1.0.0/LogoSwap_1.0.0.zip",
         "checksum": "...",
         "timestamp": "2025-11-25T12:00:00Z"
@@ -134,7 +134,7 @@ LogoSwap/
 │   └── LogoSwap_1.2.0.zip    ← Upload this to GitHub
 ├── bin/
 │   └── Release/
-│       └── net9.0/
+│       └── net10.0/
 │           └── LogoSwap.dll
 ├── build.sh
 ├── manifest.json              ← Update with new version
@@ -148,7 +148,7 @@ LogoSwap/
 ### Local Installation Test
 
 1. Build the plugin
-2. Copy `bin/Release/net9.0/LogoSwap.dll` to your Jellyfin plugins folder:
+2. Copy `bin/Release/net10.0/LogoSwap.dll` to your Jellyfin plugins folder:
    - Linux: `/var/lib/jellyfin/plugins/LogoSwap/`
    - Windows: `C:\ProgramData\Jellyfin\Server\plugins\LogoSwap\`
    - Docker: `/config/plugins/LogoSwap/`
@@ -170,7 +170,7 @@ LogoSwap/
 ## Troubleshooting
 
 ### Build fails with SDK error
-Ensure .NET 9.0 SDK is installed:
+Ensure the .NET 10.0 SDK is installed:
 ```bash
 dotnet --list-sdks
 ```

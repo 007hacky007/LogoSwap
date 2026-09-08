@@ -53,7 +53,7 @@
                             <h3 class="sectionTitle">Apply Logo to Jellyfin</h3>
                         </div>
                         <div class="fieldDescription">
-                            Click the button below to automatically inject the logo replacement script into Jellyfin's branding settings.
+                            Click the button below to write the logo replacement CSS into Jellyfin's branding settings.
                             This will make the custom logo appear across the main Jellyfin pages.
                         </div>
                         <div class="fieldDescription" style="margin-top: 0.5em; color: #888; font-size: 0.85em;">
@@ -89,8 +89,8 @@
                 'use strict';
 
                 var selectedFile = null;
-                var INJECTION_MARKER = '/* LogoSwap */';
-                var END_MARKER = '/* END LogoSwap */';
+                var CSS_MARKER = '/* LogoSwap CSS */';
+                var CSS_END_MARKER = '/* END LogoSwap CSS */';
                 var listenersAttached = false;
 
                 function init() {
@@ -150,16 +150,11 @@
                 }
 
                 function checkBrandingStatus(page, statusEl) {
-                    var cssMarker = '/* LogoSwap CSS */';
                     ApiClient.getNamedConfiguration('branding').then(function(config) {
-                        var hasJsInjection = config.CustomJs && config.CustomJs.indexOf(INJECTION_MARKER) !== -1;
-                        var hasCssInjection = config.CustomCss && config.CustomCss.indexOf(cssMarker) !== -1;
-                        
-                        if (hasJsInjection || hasCssInjection) {
-                            var methods = [];
-                            if (hasJsInjection) methods.push('JavaScript');
-                            if (hasCssInjection) methods.push('CSS');
-                            statusEl.innerHTML = '<span style="color: #4caf50;">✓ Custom logo is active (' + methods.join(' + ') + ')</span><br><small>Hard refresh your browser (Ctrl+Shift+R) to see changes.</small>';
+                        var hasCssInjection = config.CustomCss && config.CustomCss.indexOf(CSS_MARKER) !== -1;
+
+                        if (hasCssInjection) {
+                            statusEl.innerHTML = '<span style="color: #4caf50;">✓ Custom logo is active</span><br><small>Hard refresh your browser (Ctrl+Shift+R) to see changes.</small>';
                         } else {
                             statusEl.innerHTML = '<span style="color: #ff9800;">⚠ Logo uploaded but not applied</span><br><small>Click "Apply Custom Logo to Branding" to activate the logo replacement.</small>';
                         }
@@ -245,61 +240,51 @@
                     var statusEl = page.querySelector('#statusMessage');
                     statusEl.innerHTML = '<span style="color: #2196f3;">Applying branding...</span>';
 
-                    // First get the injection script
-                    fetch('/logoswap/script', { credentials: 'include' })
-                    .then(function(response) { return response.text(); })
-                    .then(function(script) {
-                        // Get current branding config
-                        return ApiClient.getNamedConfiguration('branding').then(function(config) {
-                            // Remove existing JS injection if present
-                            var existingJs = config.CustomJs || '';
-                            if (existingJs.indexOf(INJECTION_MARKER) !== -1) {
-                                var startIdx = existingJs.indexOf(INJECTION_MARKER);
-                                var endIdx = existingJs.indexOf(END_MARKER);
-                                if (endIdx > startIdx) {
-                                    existingJs = existingJs.substring(0, startIdx) + existingJs.substring(endIdx + END_MARKER.length);
-                                    existingJs = existingJs.trim();
-                                }
+                    ApiClient.getNamedConfiguration('branding').then(function(config) {
+                        var existingCss = config.CustomCss || '';
+
+                        // Remove existing CSS injection
+                        if (existingCss.indexOf(CSS_MARKER) !== -1) {
+                            var cssStart = existingCss.indexOf(CSS_MARKER);
+                            var cssEnd = existingCss.indexOf(CSS_END_MARKER);
+                            if (cssEnd > cssStart) {
+                                existingCss = existingCss.substring(0, cssStart) + existingCss.substring(cssEnd + CSS_END_MARKER.length);
+                                existingCss = existingCss.trim();
                             }
-                            
-                            // Add new JS injection
-                            config.CustomJs = existingJs ? existingJs + '\n\n' + script : script;
-                            
-                            // Also add CSS as backup method
-                            var cssMarker = '/* LogoSwap CSS */';
-                            var cssEndMarker = '/* END LogoSwap CSS */';
-                            var existingCss = config.CustomCss || '';
-                            
-                            // Remove existing CSS injection
-                            if (existingCss.indexOf(cssMarker) !== -1) {
-                                var cssStart = existingCss.indexOf(cssMarker);
-                                var cssEnd = existingCss.indexOf(cssEndMarker);
-                                if (cssEnd > cssStart) {
-                                    existingCss = existingCss.substring(0, cssStart) + existingCss.substring(cssEnd + cssEndMarker.length);
-                                    existingCss = existingCss.trim();
-                                }
-                            }
-                            
-                            // Add CSS injection for logo replacement
-                            var logoUrl = '/logoswap/image?v=' + Date.now();
-                            var cssInjection = cssMarker + '\n' +
-                                '.pageTitleWithLogo, .pageTitleWithDefaultLogo,\n' +
-                                '.logoImage, .navDrawerLogo, .adminDrawerLogo {\n' +
-                                '  background-image: url("' + logoUrl + '") !important;\n' +
-                                '  background-size: contain !important;\n' +
-                                '  background-repeat: no-repeat !important;\n' +
-                                '  background-color: transparent !important;\n' +
-                                '}\n' +
-                                'img[src*="banner-light"], img[src*="banner-dark"],\n' +
-                                'img[src*="icon-transparent"], .imgLogoIcon {\n' +
-                                '  content: url("' + logoUrl + '") !important;\n' +
-                                '}\n' +
-                                cssEndMarker;
-                            
-                            config.CustomCss = existingCss ? existingCss + '\n\n' + cssInjection : cssInjection;
-                            
-                            return ApiClient.updateNamedConfiguration('branding', config);
-                        });
+                        }
+
+                        // Add CSS injection for logo replacement
+                        var logoUrl = '/logoswap/image?v=' + Date.now();
+                        var cssInjection = CSS_MARKER + '\n' +
+                            '/* Legacy layout: the header logo is a background-image. */\n' +
+                            '.pageTitleWithLogo, .pageTitleWithDefaultLogo {\n' +
+                            '  background-image: url("' + logoUrl + '") !important;\n' +
+                            '  background-size: contain !important;\n' +
+                            '  background-repeat: no-repeat !important;\n' +
+                            '  background-position: center !important;\n' +
+                            '  background-color: transparent !important;\n' +
+                            '}\n' +
+                            '/* Modern layout (default since Jellyfin 12): the app bar and\n' +
+                            '   drawer logos are <img> elements with an inline height cap.\n' +
+                            '   Keep their height, drop the width cap so a wide logo can\n' +
+                            '   expand to its own aspect ratio instead of being squashed. */\n' +
+                            'img[src*="icon-transparent"],\n' +
+                            'img[src*="banner-light"], img[src*="banner-dark"] {\n' +
+                            '  content: url("' + logoUrl + '") !important;\n' +
+                            '  max-width: none !important;\n' +
+                            '  width: auto !important;\n' +
+                            '  object-fit: contain !important;\n' +
+                            '}\n' +
+                            '/* Splash screen. Rendered before custom CSS is applied, so the\n' +
+                            '   default logo can still flash briefly on a cold load. */\n' +
+                            '.splashLogo {\n' +
+                            '  background-image: url("' + logoUrl + '") !important;\n' +
+                            '}\n' +
+                            CSS_END_MARKER;
+
+                        config.CustomCss = existingCss ? existingCss + '\n\n' + cssInjection : cssInjection;
+
+                        return ApiClient.updateNamedConfiguration('branding', config);
                     })
                     .then(function() {
                         statusEl.innerHTML = '<span style="color: #4caf50;">✓ Custom logo applied to branding!</span><br><small>Hard refresh your browser (Ctrl+Shift+R or Cmd+Shift+R) to see the new logo.</small>';
@@ -315,31 +300,16 @@
                         statusEl.innerHTML = '<span style="color: #2196f3;">Removing branding...</span>';
                     }
 
-                    var cssMarker = '/* LogoSwap CSS */';
-                    var cssEndMarker = '/* END LogoSwap CSS */';
-
                     ApiClient.getNamedConfiguration('branding').then(function(config) {
                         var changed = false;
-                        var existingJs = config.CustomJs || '';
                         var existingCss = config.CustomCss || '';
-                        
-                        // Remove JS injection
-                        if (existingJs.indexOf(INJECTION_MARKER) !== -1) {
-                            var startIdx = existingJs.indexOf(INJECTION_MARKER);
-                            var endIdx = existingJs.indexOf(END_MARKER);
-                            if (endIdx > startIdx) {
-                                existingJs = existingJs.substring(0, startIdx) + existingJs.substring(endIdx + END_MARKER.length);
-                                config.CustomJs = existingJs.trim();
-                                changed = true;
-                            }
-                        }
-                        
+
                         // Remove CSS injection
-                        if (existingCss.indexOf(cssMarker) !== -1) {
-                            var cssStart = existingCss.indexOf(cssMarker);
-                            var cssEnd = existingCss.indexOf(cssEndMarker);
+                        if (existingCss.indexOf(CSS_MARKER) !== -1) {
+                            var cssStart = existingCss.indexOf(CSS_MARKER);
+                            var cssEnd = existingCss.indexOf(CSS_END_MARKER);
                             if (cssEnd > cssStart) {
-                                existingCss = existingCss.substring(0, cssStart) + existingCss.substring(cssEnd + cssEndMarker.length);
+                                existingCss = existingCss.substring(0, cssStart) + existingCss.substring(cssEnd + CSS_END_MARKER.length);
                                 config.CustomCss = existingCss.trim();
                                 changed = true;
                             }

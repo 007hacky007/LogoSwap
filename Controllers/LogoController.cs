@@ -177,17 +177,4 @@ public class LogoController : ControllerBase
         
         return Ok(new { hasLogo, logoUrl = hasLogo ? "/logoswap/image" : null });
     }
-
-    /// <summary>
-    /// Gets the JavaScript code for logo injection.
-    /// </summary>
-    /// <response code="200">Returns the JavaScript code.</response>
-    /// <returns>JavaScript code for branding injection.</returns>
-    [HttpGet("script")]
-    [Produces("application/javascript")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult<string> GetScript()
-    {
-        return Content(LogoInjector.GetInjectionScript(), "application/javascript");
-    }
 }

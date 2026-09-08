@@ -67,35 +67,54 @@ dotnet build -c "$BUILD_CONFIG" --nologo -v q \
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
-# Package the plugin
+# Package the plugin, once per target framework
 echo -e "${YELLOW}[4/5] Packaging plugin...${NC}"
 
-# Create a temporary directory for packaging
-TEMP_DIR=$(mktemp -d)
-PLUGIN_DIR="$TEMP_DIR/$PROJECT_NAME"
-mkdir -p "$PLUGIN_DIR"
+# Jellyfin ships one plugin DLL per server ABI: 10.11 runs .NET 9, 12.0 runs
+# .NET 10. Read the ABI for each target framework out of the project so this
+# does not need editing on the next bump.
+TARGET_FRAMEWORKS=$(dotnet msbuild "$PROJECT_NAME.csproj" -getProperty:TargetFrameworks | tr ';' ' ')
 
-# Copy the DLL and plugin image to the package directory
-cp "./bin/$BUILD_CONFIG/net9.0/$PROJECT_NAME.dll" "$PLUGIN_DIR/"
-cp "./bin/$BUILD_CONFIG/net9.0/image.png" "$PLUGIN_DIR/image.png"
+md5_of() {
+    if command -v md5sum &> /dev/null; then
+        md5sum "$1" | awk '{print $1}'
+    elif command -v md5 &> /dev/null; then
+        md5 -q "$1"
+    else
+        echo "(md5 command not found)"
+    fi
+}
 
-# Create the ZIP file
-ZIP_FILE="$OUTPUT_DIR/${PROJECT_NAME}_${VERSION}.zip"
-(cd "$TEMP_DIR" && zip -rq "$PROJECT_NAME.zip" "$PROJECT_NAME")
-mv "$TEMP_DIR/$PROJECT_NAME.zip" "$ZIP_FILE"
+ZIP_FILES=()
+TARGET_ABIS=()
+CHECKSUMS=()
 
-# Cleanup temp directory
-rm -rf "$TEMP_DIR"
+for TFM in $TARGET_FRAMEWORKS; do
+    ABI="$(dotnet msbuild "$PROJECT_NAME.csproj" -p:TargetFramework="$TFM" -getItem:PackageReference \
+        | jq -r '.Items.PackageReference[] | select(.Identity=="Jellyfin.Controller") | .Version').0"
+    # 10.11.0.0 -> jf10.11, 12.0.0.0 -> jf12.0
+    LABEL="jf$(echo "$ABI" | cut -d. -f1-2)"
 
-# Generate checksum
+    TEMP_DIR=$(mktemp -d)
+    PLUGIN_DIR="$TEMP_DIR/$PROJECT_NAME"
+    mkdir -p "$PLUGIN_DIR"
+
+    cp "./bin/$BUILD_CONFIG/$TFM/$PROJECT_NAME.dll" "$PLUGIN_DIR/"
+    cp "./bin/$BUILD_CONFIG/$TFM/image.png" "$PLUGIN_DIR/image.png"
+
+    ZIP_FILE="$OUTPUT_DIR/${PROJECT_NAME}_${VERSION}_${LABEL}.zip"
+    (cd "$TEMP_DIR" && zip -rq "$PROJECT_NAME.zip" "$PROJECT_NAME")
+    mv "$TEMP_DIR/$PROJECT_NAME.zip" "$ZIP_FILE"
+    rm -rf "$TEMP_DIR"
+
+    echo "  $TFM -> $ZIP_FILE (targetAbi $ABI)"
+
+    ZIP_FILES+=("$ZIP_FILE")
+    TARGET_ABIS+=("$ABI")
+    CHECKSUMS+=("$(md5_of "$ZIP_FILE")")
+done
+
 echo -e "${YELLOW}[5/5] Generating checksums...${NC}"
-if command -v md5sum &> /dev/null; then
-    CHECKSUM=$(md5sum "$ZIP_FILE" | awk '{print $1}')
-elif command -v md5 &> /dev/null; then
-    CHECKSUM=$(md5 -q "$ZIP_FILE")
-else
-    CHECKSUM="(md5 command not found)"
-fi
 
 # Output results
 echo ""
@@ -104,26 +123,26 @@ echo -e "${GREEN}║         Build Successful! ✓            ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${CYAN}Output files:${NC}"
-echo "  → $ZIP_FILE"
-echo "  → ./bin/$BUILD_CONFIG/net9.0/$PROJECT_NAME.dll"
-echo ""
-echo -e "${CYAN}Package contents:${NC}"
-unzip -l "$ZIP_FILE" | grep -E "^\s+[0-9]+" | grep -v "files$" | awk '{print "  " $NF}'
-echo ""
-echo -e "${CYAN}MD5 Checksum:${NC}"
-echo "  $CHECKSUM"
+for i in "${!ZIP_FILES[@]}"; do
+    echo "  → ${ZIP_FILES[$i]}  (Jellyfin ${TARGET_ABIS[$i]}, md5 ${CHECKSUMS[$i]})"
+done
 echo ""
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}Update your manifest.json with:${NC}"
+echo -e "${YELLOW}Add these manifest.json entries, highest targetAbi FIRST.${NC}"
+echo -e "${YELLOW}Jellyfin picks the first entry whose targetAbi <= the server${NC}"
+echo -e "${YELLOW}version, so ordering is what keeps each server on its build.${NC}"
 echo ""
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+for i in $(seq $(( ${#ZIP_FILES[@]} - 1 )) -1 0); do
 cat << EOF
 {
   "version": "${VERSION}.0",
   "changelog": "Your changelog here",
-  "targetAbi": "10.11.0.0",
-  "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/$VERSION/${PROJECT_NAME}_${VERSION}.zip",
-  "checksum": "$CHECKSUM",
-  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-}
+  "targetAbi": "${TARGET_ABIS[$i]}",
+  "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/$VERSION/$(basename "${ZIP_FILES[$i]}")",
+  "checksum": "${CHECKSUMS[$i]}",
+  "timestamp": "$TIMESTAMP"
+},
 EOF
+done
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
