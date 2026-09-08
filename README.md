@@ -1,14 +1,14 @@
 # LogoSwap
 
-**Custom logo replacement plugin for Jellyfin 10.11+**
+**Custom logo replacement plugin for Jellyfin 10.11 and 12.0**
 <img src="static/icon.png" alt="LogoSwap" width="140" align="right">
 
 Replace the default Jellyfin branding with your own logo across the entire interface—no manual file editing required.
 
 
 
-![Jellyfin](https://img.shields.io/badge/Jellyfin-10.11+-00a4dc?style=flat-square&logo=jellyfin)
-![.NET](https://img.shields.io/badge/.NET-9.0-512bd4?style=flat-square&logo=dotnet)
+![Jellyfin](https://img.shields.io/badge/Jellyfin-10.11%20%7C%2012.0-00a4dc?style=flat-square&logo=jellyfin)
+![.NET](https://img.shields.io/badge/.NET-9.0%20%7C%2010.0-512bd4?style=flat-square&logo=dotnet)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
 
@@ -80,7 +80,6 @@ Your custom logo will now appear across the main Jellyfin interface.
 | `/logoswap/image` | GET | Retrieve the current logo |
 | `/logoswap/delete` | DELETE | Delete the uploaded logo |
 | `/logoswap/status` | GET | Check if a logo is configured |
-| `/logoswap/script` | GET | Get the injection JavaScript |
 
 ---
 
@@ -88,11 +87,12 @@ Your custom logo will now appear across the main Jellyfin interface.
 
 LogoSwap uses Jellyfin's built-in branding customization system. When you click "Apply Custom Logo to Branding", the plugin:
 
-1. Generates CSS rules that override logo background-images
-2. Creates JavaScript to replace logo `<img>` elements
-3. Injects both into Jellyfin's Custom CSS & Custom JS settings
+1. Generates CSS rules that override the logo, covering both the Modern
+   layout (default since Jellyfin 12) and the Legacy layout
+2. Writes them into Jellyfin's branding Custom CSS setting, between
+   `/* LogoSwap CSS */` markers so they can be removed again cleanly
 
-This approach is non-destructive—your original Jellyfin files are never modified.
+This approach is non-destructive: your original Jellyfin files are never modified.
 
 ---
 
@@ -104,14 +104,16 @@ cd LogoSwap
 dotnet build
 ```
 
-Output: `bin/Debug/net9.0/LogoSwap.dll`
+Output: `bin/Debug/net9.0/LogoSwap.dll` (Jellyfin 10.11) and `bin/Debug/net10.0/LogoSwap.dll` (Jellyfin 12.0)
 
 ---
 
 ## Requirements
 
-- Jellyfin Server 10.11.0+
-- .NET 9.0 Runtime (bundled with Jellyfin 10.11)
+- Jellyfin Server 10.11.x or 12.0+
+- .NET 9.0 Runtime (bundled with Jellyfin 10.11) or .NET 10.0 (bundled with Jellyfin 12.0)
+
+The plugin ships one build per server version. The plugin catalogue picks the right one automatically.
 
 ---
 
