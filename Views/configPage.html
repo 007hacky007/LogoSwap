@@ -154,7 +154,7 @@
                         var hasCssInjection = config.CustomCss && config.CustomCss.indexOf(CSS_MARKER) !== -1;
 
                         if (hasCssInjection) {
-                            statusEl.innerHTML = '<span style="color: #4caf50;">✓ Custom logo is active</span><br><small>Hard refresh your browser (Ctrl+Shift+R) to see changes.</small>';
+                            statusEl.innerHTML = '<span style="color: #4caf50;">✓ Custom logo is active</span><br><small>Hard refresh your browser (Ctrl+Shift+R) to see changes. After updating the plugin, click Apply again to refresh the CSS.</small>';
                         } else {
                             statusEl.innerHTML = '<span style="color: #ff9800;">⚠ Logo uploaded but not applied</span><br><small>Click "Apply Custom Logo to Branding" to activate the logo replacement.</small>';
                         }
@@ -267,20 +267,16 @@
                             '  background-color: transparent !important;\n' +
                             '}\n' +
                             '/* Modern layout (default since Jellyfin 12): the app bar and\n' +
-                            '   drawer logos are <img> elements with an inline height cap.\n' +
-                            '   Keep their height, drop the width cap so a wide logo can\n' +
-                            '   expand to its own aspect ratio instead of being squashed. */\n' +
+                            '   drawer logos are <img> elements. The app bar caps them at\n' +
+                            '   1.25em square, which squashes a wide logo, so widen the box\n' +
+                            '   but keep it bounded: an unbounded width lets a wide image\n' +
+                            '   push the toolbar controls off screen. */\n' +
                             'img[src*="icon-transparent"],\n' +
                             'img[src*="banner-light"], img[src*="banner-dark"] {\n' +
                             '  content: url("' + logoUrl + '") !important;\n' +
-                            '  max-width: none !important;\n' +
+                            '  max-width: min(12rem, 33vw) !important;\n' +
                             '  width: auto !important;\n' +
                             '  object-fit: contain !important;\n' +
-                            '}\n' +
-                            '/* Splash screen. Rendered before custom CSS is applied, so the\n' +
-                            '   default logo can still flash briefly on a cold load. */\n' +
-                            '.splashLogo {\n' +
-                            '  background-image: url("' + logoUrl + '") !important;\n' +
                             '}\n' +
                             CSS_END_MARKER;
 
