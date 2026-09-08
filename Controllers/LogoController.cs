@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Threading.Tasks;
 using MediaBrowser.Common.Configuration;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,8 @@ namespace LogoSwap.Controllers;
 [Route("logoswap")]
 public class LogoController : ControllerBase
 {
+    private const long MaxLogoBytes = 4 * 1024 * 1024;
+
     private readonly ILogger<LogoController> _logger;
     private readonly IApplicationPaths _applicationPaths;
 
@@ -39,8 +42,11 @@ public class LogoController : ControllerBase
     /// <response code="500">Error saving file.</response>
     /// <returns>A status message.</returns>
     [HttpPost("upload")]
+    [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<string>> UploadLogo([Required] IFormFile file)
     {
@@ -49,10 +55,18 @@ public class LogoController : ControllerBase
             return BadRequest("No file uploaded.");
         }
 
-        // Validate file type
-        if (!file.ContentType.Equals("image/png", StringComparison.OrdinalIgnoreCase))
+        if (file.Length > MaxLogoBytes)
         {
-            return BadRequest("Only PNG files are accepted.");
+            return BadRequest("Logo must be 4 MiB or smaller.");
+        }
+
+        // Validate the file content, not the client-supplied content type
+        await using (var probe = file.OpenReadStream())
+        {
+            if (!await IsPngAsync(probe).ConfigureAwait(false))
+            {
+                return BadRequest("Only PNG files are accepted.");
+            }
         }
 
         try
@@ -88,6 +102,21 @@ public class LogoController : ControllerBase
     }
 
     /// <summary>
+    /// Checks whether a stream starts with the PNG file signature.
+    /// </summary>
+    /// <param name="stream">The stream to inspect.</param>
+    /// <returns>True if the stream starts with the PNG signature.</returns>
+    private static async Task<bool> IsPngAsync(Stream stream)
+    {
+        var header = new byte[8];
+        var read = await stream.ReadAtLeastAsync(header, header.Length, throwOnEndOfStream: false).ConfigureAwait(false);
+
+        return read == header.Length
+            && header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47
+            && header[4] == 0x0D && header[5] == 0x0A && header[6] == 0x1A && header[7] == 0x0A;
+    }
+
+    /// <summary>
     /// Gets the current custom logo.
     /// </summary>
     /// <response code="200">Returns the custom logo image.</response>
@@ -95,6 +124,7 @@ public class LogoController : ControllerBase
     /// <response code="404">No custom logo found.</response>
     /// <returns>The logo image file.</returns>
     [HttpGet("image")]
+    [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -132,7 +162,10 @@ public class LogoController : ControllerBase
     /// <response code="404">No custom logo found.</response>
     /// <returns>A status message.</returns>
     [HttpDelete("delete")]
+    [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult DeleteLogo()
     {
