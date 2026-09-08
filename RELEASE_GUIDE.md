@@ -41,30 +41,42 @@ Before building, update the version in these files:
 ./build.sh 1.2.0
 ```
 
-Output files will be in `./artifacts/`:
-- `LogoSwap_1.2.0.zip` — The distribution package
+The plugin ships one build per Jellyfin ABI, since 10.11 runs on .NET 9 and
+12.0 on .NET 10. Output files will be in `./artifacts/`:
+
+- `LogoSwap_1.2.0_jf10.11.zip` — for Jellyfin 10.11 (`targetAbi` 10.11.0.0)
+- `LogoSwap_1.2.0_jf12.0.zip` — for Jellyfin 12.0 (`targetAbi` 12.0.0.0)
 
 ### Step 3: Create GitHub Release
 
-1. **Tag the release:**
-   ```bash
-   git add .
-   git commit -m "Release v1.2.0"
-   git tag -a 1.2.0 -m "Version 1.2.0"
-   git push origin main --tags
-   ```
+Tagging is enough. The release workflow builds every target framework,
+attaches both zips and updates the manifest:
 
-2. **Create Release on GitHub:**
-   - Go to your repository → **Releases** → **Draft a new release**
-   - Choose the tag you just created (`1.2.0`)
-   - Title: `v1.2.0`
-   - Description: Add your changelog
-   - Attach `artifacts/LogoSwap_1.2.0.zip`
-   - Click **Publish release**
+```bash
+git add .
+git commit -m "Release v1.2.0"
+git tag -a 1.2.0 -m "Version 1.2.0"
+git push origin main --tags
+```
+
+A tag with a suffix, such as `1.2.0-beta.1`, is published as a pre-release and
+goes to `manifest-testing.json` instead. Number pre-releases of the same
+version in increasing order: the trailing number becomes the fourth part of
+the plugin version (`1.2.0-beta.1` is `1.2.0.1`), and Jellyfin only offers an
+update whose version is strictly greater than the installed one.
+
+To publish by hand instead, attach both zips to the release and add the
+manifest entries below.
 
 ### Step 4: Update manifest.json
 
-The build script outputs the exact JSON to add. Update `manifest.json`:
+The build script outputs the exact JSON to add: one entry per ABI, sharing a
+version number. List the **highest `targetAbi` first**. Jellyfin installs the
+first entry whose `targetAbi` is not greater than the server version, and
+entries with equal version numbers keep manifest order, so the ordering is
+what sends each server to its own build.
+
+Update `manifest.json`:
 
 ```json
 [
@@ -78,17 +90,25 @@ The build script outputs the exact JSON to add. Update `manifest.json`:
     "imageUrl": "https://raw.githubusercontent.com/NewsGuyTor/LogoSwap/main/static/icon.png",
     "versions": [
       {
-        "version": "1.2.0",
+        "version": "1.2.0.0",
         "changelog": "New feature: Added awesome thing",
-        "targetAbi": "12.0.0.0"   // one entry per supported ABI, highest first,
-        "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/1.2.0/LogoSwap_1.2.0.zip",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/1.2.0/LogoSwap_1.2.0_jf12.0.zip",
         "checksum": "abc123def456...",
         "timestamp": "2025-11-25T12:00:00Z"
       },
       {
-        "version": "1.0.0",
+        "version": "1.2.0.0",
+        "changelog": "New feature: Added awesome thing",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/1.2.0/LogoSwap_1.2.0_jf10.11.zip",
+        "checksum": "def456abc123...",
+        "timestamp": "2025-11-25T12:00:00Z"
+      },
+      {
+        "version": "1.0.0.0",
         "changelog": "Initial release.",
-        "targetAbi": "12.0.0.0"   // one entry per supported ABI, highest first,
+        "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/1.0.0/LogoSwap_1.0.0.zip",
         "checksum": "...",
         "timestamp": "2025-11-25T12:00:00Z"
@@ -118,10 +138,10 @@ The build script automatically generates an MD5 checksum. This is used by Jellyf
 
 ```bash
 # macOS
-md5 -q artifacts/LogoSwap_1.2.0.zip
+md5 -q artifacts/LogoSwap_1.2.0_jf12.0.zip
 
 # Linux
-md5sum artifacts/LogoSwap_1.2.0.zip | awk '{print $1}'
+md5sum artifacts/LogoSwap_1.2.0_jf12.0.zip | awk '{print $1}'
 ```
 
 ---
@@ -131,9 +151,12 @@ md5sum artifacts/LogoSwap_1.2.0.zip | awk '{print $1}'
 ```
 LogoSwap/
 ├── artifacts/
-│   └── LogoSwap_1.2.0.zip    ← Upload this to GitHub
+│   ├── LogoSwap_1.2.0_jf10.11.zip   ← Jellyfin 10.11
+│   └── LogoSwap_1.2.0_jf12.0.zip    ← Jellyfin 12.0
 ├── bin/
 │   └── Release/
+│       ├── net9.0/
+│       │   └── LogoSwap.dll
 │       └── net10.0/
 │           └── LogoSwap.dll
 ├── build.sh

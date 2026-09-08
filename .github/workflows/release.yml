@@ -31,26 +31,43 @@ jobs:
         run: |
           FULL_VERSION="${GITHUB_REF_NAME#v}"
           BASE_VERSION="${FULL_VERSION%%-*}"
-          echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          echo "VERSION=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "BASE_VERSION=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+
+          # Jellyfin versions are four numeric parts and its updater only offers
+          # a build strictly greater than the installed one, so every tag needs a
+          # distinct number. A stable release is X.Y.Z.0; a prerelease takes the
+          # trailing number of its suffix as the fourth part, which keeps betas
+          # ordered among themselves (2.0.0-beta.1 -> 2.0.0.1, beta.2 -> 2.0.0.2).
+          # Number prereleases of the same version in increasing order.
           if [[ "$FULL_VERSION" == *-* ]]; then
-            echo "PRERELEASE=true" >> "$GITHUB_OUTPUT"
+            SUFFIX="${FULL_VERSION#*-}"
+            REVISION="$(echo "$SUFFIX" | grep -oE '[0-9]+$' || true)"
+            PLUGIN_VERSION="${BASE_VERSION}.${REVISION:-1}"
+            PRERELEASE=true
           else
-            echo "PRERELEASE=false" >> "$GITHUB_OUTPUT"
+            PLUGIN_VERSION="${BASE_VERSION}.0"
+            PRERELEASE=false
           fi
+
+          echo "Tag ${GITHUB_REF_NAME} -> plugin version ${PLUGIN_VERSION} (prerelease: ${PRERELEASE})"
+          {
+            echo "TAG=${GITHUB_REF_NAME}"
+            echo "VERSION=${FULL_VERSION}"
+            echo "BASE_VERSION=${BASE_VERSION}"
+            echo "PLUGIN_VERSION=${PLUGIN_VERSION}"
+            echo "PRERELEASE=${PRERELEASE}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Restore dependencies
         run: dotnet restore
 
       - name: Build
-        run: dotnet build --configuration Release --no-restore /p:Version=${{ steps.version.outputs.BASE_VERSION }}.0 /p:AssemblyVersion=${{ steps.version.outputs.BASE_VERSION }}.0 /p:FileVersion=${{ steps.version.outputs.BASE_VERSION }}.0
+        run: dotnet build --configuration Release --no-restore /p:Version=${{ steps.version.outputs.PLUGIN_VERSION }} /p:AssemblyVersion=${{ steps.version.outputs.PLUGIN_VERSION }} /p:FileVersion=${{ steps.version.outputs.PLUGIN_VERSION }}
 
       - name: Package
         id: package
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
-          BASE_VERSION="${{ steps.version.outputs.BASE_VERSION }}"
+          PLUGIN_VERSION="${{ steps.version.outputs.PLUGIN_VERSION }}"
           REPO="${{ github.repository }}"
           mkdir -p release
 
@@ -81,7 +98,7 @@ jobs:
             "overview": "Upload a custom logo to replace Jellyfin branding throughout the interface.",
             "owner": "${REPO%%/*}",
             "category": "General",
-            "version": "${BASE_VERSION}.0",
+            "version": "${PLUGIN_VERSION}",
             "targetAbi": "${TARGET_ABI}",
             "status": "Active",
             "autoUpdate": true,
@@ -121,7 +138,7 @@ jobs:
           git checkout main
 
           TAG="${{ steps.version.outputs.TAG }}"
-          BASE_VERSION="${{ steps.version.outputs.BASE_VERSION }}"
+          PLUGIN_VERSION="${{ steps.version.outputs.PLUGIN_VERSION }}"
           PRERELEASE="${{ steps.version.outputs.PRERELEASE }}"
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           REPO="${{ github.repository }}"
@@ -140,7 +157,7 @@ jobs:
             jq '.[0].versions = []' "$MANIFEST_FILE" > tmp.json && mv tmp.json "$MANIFEST_FILE"
           fi
 
-          jq --arg ver "${BASE_VERSION}.0" \
+          jq --arg ver "${PLUGIN_VERSION}" \
              --arg ts "$TIMESTAMP" \
              --arg base "https://github.com/${REPO}/releases/download/${TAG}" \
              --arg owner "$OWNER" \
