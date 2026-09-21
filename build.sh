@@ -139,7 +139,7 @@ cat << EOF
   "version": "${VERSION}.0",
   "changelog": "Your changelog here",
   "targetAbi": "${TARGET_ABIS[$i]}",
-  "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/$VERSION/$(basename "${ZIP_FILES[$i]}")",
+  "sourceUrl": "https://github.com/007hacky007/LogoSwap/releases/download/v$VERSION/$(basename "${ZIP_FILES[$i]}")",
   "checksum": "${CHECKSUMS[$i]}",
   "timestamp": "$TIMESTAMP"
 },

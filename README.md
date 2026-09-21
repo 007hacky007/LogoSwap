@@ -3,8 +3,9 @@
 **Custom logo replacement plugin for Jellyfin 10.11 and 12.0**
 <img src="static/icon.png" alt="LogoSwap" width="140" align="right">
 
-Replace the default Jellyfin branding with your own logo across the entire interface—no manual file editing required.
+Replace the default Jellyfin branding with your own logo across the entire interface - no manual file editing required.
 
+> **This is a maintained fork.** LogoSwap was created by [NewsGuyTor](https://github.com/NewsGuyTor/LogoSwap). The original repository has had no activity since March 2026, so development continues here, starting with Jellyfin 12.0 support. If you installed LogoSwap from the original repository, replace its plugin repository URL with the one [below](#via-plugin-repository-recommended) to keep receiving updates. Your uploaded logo is kept; after updating, click **Apply Custom Logo to Branding** once more so the new CSS replaces the old.
 
 
 ![Jellyfin](https://img.shields.io/badge/Jellyfin-10.11%20%7C%2012.0-00a4dc?style=flat-square&logo=jellyfin)
@@ -14,10 +15,10 @@ Replace the default Jellyfin branding with your own logo across the entire inter
 
 ## Features
 
-- **Simple Upload Interface** — Upload your logo directly from the Jellyfin dashboard
-- **One-Click Activation** — Automatically injects CSS & JavaScript into branding settings
-- **Live Preview** — See your current logo before applying changes
-- **Easy Removal** — Restore default Jellyfin branding with a single click
+- **Simple Upload Interface** - Upload your logo directly from the Jellyfin dashboard
+- **One-Click Activation** - Writes the logo CSS into Jellyfin's branding settings
+- **Live Preview** - See your current logo before applying changes
+- **Easy Removal** - Restore default Jellyfin branding with a single click
 
 ---
 
@@ -28,15 +29,15 @@ Replace the default Jellyfin branding with your own logo across the entire inter
 1. Open Jellyfin Dashboard → **Plugins** → **Repositories**
 2. Click **+** to add a new repository:
    - **Name:** `LogoSwap`
-   - **URL:** `https://raw.githubusercontent.com/NewsGuyTor/LogoSwap/main/manifest.json`
+   - **URL:** `https://raw.githubusercontent.com/007hacky007/LogoSwap/main/manifest.json`
 3. Go to **Plugins** → **Catalog**
 4. Find **LogoSwap** and click **Install**
 5. Restart Jellyfin
 
 ### Manual Installation
 
-1. Download the latest release from [Releases](https://github.com/NewsGuyTor/LogoSwap/releases)
-2. Extract `LogoSwap.dll` to your Jellyfin plugins directory:
+1. Download the zip matching your server from [Releases](https://github.com/007hacky007/LogoSwap/releases): `_jf10.11.zip` for Jellyfin 10.11, `_jf12.0.zip` for Jellyfin 12.0
+2. Extract its contents to your Jellyfin plugins directory:
    - Linux: `/var/lib/jellyfin/plugins/LogoSwap/`
    - Windows: `C:\ProgramData\Jellyfin\Server\plugins\LogoSwap\`
    - Docker: `/config/plugins/LogoSwap/`
@@ -50,8 +51,7 @@ Replace the default Jellyfin branding with your own logo across the entire inter
 
 Navigate to **Dashboard** → **Plugins** → **LogoSwap**
 
-- Click **Select Logo Image (PNG)** and choose your logo file
-- Click **Upload Logo**
+- Click **Select Logo Image (PNG)** and choose your logo file. It uploads as soon as you pick it.
 
 > **Tip:** For best results, use a PNG with a transparent background. Recommended dimensions: 400×100px or similar wide aspect ratio.
 
@@ -66,9 +66,9 @@ Your custom logo will now appear across the main Jellyfin interface.
 
 ### 3. Manage Your Logo
 
-- **Preview** — View your current uploaded logo
-- **Delete Logo** — Remove your logo and restore default branding
-- **Remove from Branding** — Disable the logo without deleting the file
+- **Preview** - View your current uploaded logo
+- **Delete Logo** - Remove your logo and restore default branding
+- **Remove from Branding** - Disable the logo without deleting the file
 
 ---
 
@@ -102,7 +102,7 @@ This approach is non-destructive: your original Jellyfin files are never modifie
 ## Building from Source
 
 ```bash
-git clone https://github.com/NewsGuyTor/LogoSwap.git
+git clone https://github.com/007hacky007/LogoSwap.git
 cd LogoSwap
 dotnet build
 ```
@@ -128,7 +128,7 @@ The plugin ships one build per server version. The plugin catalogue picks the ri
 - Check Dashboard → General → Branding to verify injection is present
 
 **Upload fails?**
-- Ensure the file is PNG format
+- Ensure the file is a PNG under 4 MB
 - Check Jellyfin has write permissions to its plugin config directory
 - Review server logs for detailed error messages
 
@@ -138,7 +138,7 @@ The plugin ships one build per server version. The plugin catalogue picks the ri
 
 **Why doesn't my logo appear in the Dashboard?**
 
-The Jellyfin Dashboard admin area uses a separate interface where custom branding (Custom CSS/JS) is not applied. This is a limitation of how Jellyfin handles its admin pages. Your custom logo will appear on all regular user-facing pages.
+The Jellyfin Dashboard admin area uses a separate interface where custom branding CSS is not applied. This is a limitation of how Jellyfin handles its admin pages. Your custom logo will appear on all regular user-facing pages.
 
 **Can I replace the splash/loading screen logo?**
 
@@ -154,16 +154,15 @@ Your logo is stored in the plugin's data directory within Jellyfin's configurati
 
 Bug reports, feature requests, and pull requests are welcome!
 
-- **Found a bug?** [Open an issue](https://github.com/NewsGuyTor/LogoSwap/issues)
-- **Have an idea?** [Start a discussion](https://github.com/NewsGuyTor/LogoSwap/discussions)
+- **Found a bug or have an idea?** [Open an issue](https://github.com/007hacky007/LogoSwap/issues)
 - **Want to contribute?** Fork the repo and submit a PR
 
 ---
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Author:** [NewsGuyTor](https://github.com/NewsGuyTor)
+**Original author:** [NewsGuyTor](https://github.com/NewsGuyTor). Maintained as a fork since September 2026.

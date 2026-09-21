@@ -44,8 +44,8 @@ Before building, update the version in these files:
 The plugin ships one build per Jellyfin ABI, since 10.11 runs on .NET 9 and
 12.0 on .NET 10. Output files will be in `./artifacts/`:
 
-- `LogoSwap_1.2.0_jf10.11.zip` — for Jellyfin 10.11 (`targetAbi` 10.11.0.0)
-- `LogoSwap_1.2.0_jf12.0.zip` — for Jellyfin 12.0 (`targetAbi` 12.0.0.0)
+- `LogoSwap_1.2.0_jf10.11.zip` - for Jellyfin 10.11 (`targetAbi` 10.11.0.0)
+- `LogoSwap_1.2.0_jf12.0.zip` - for Jellyfin 12.0 (`targetAbi` 12.0.0.0)
 
 ### Step 3: Create GitHub Release
 
@@ -55,14 +55,14 @@ attaches both zips and updates the manifest:
 ```bash
 git add .
 git commit -m "Release v1.2.0"
-git tag -a 1.2.0 -m "Version 1.2.0"
+git tag -a v1.2.0 -m "Version 1.2.0"
 git push origin main --tags
 ```
 
-A tag with a suffix, such as `1.2.0-beta.1`, is published as a pre-release and
+A tag with a suffix, such as `v1.2.0-beta.1`, is published as a pre-release and
 goes to `manifest-testing.json` instead. Number pre-releases of the same
 version in increasing order: the trailing number becomes the fourth part of
-the plugin version (`1.2.0-beta.1` is `1.2.0.1`), and Jellyfin only offers an
+the plugin version (`v1.2.0-beta.1` is `1.2.0.1`), and Jellyfin only offers an
 update whose version is strictly greater than the installed one.
 
 To publish by hand instead, attach both zips to the release and add the
@@ -85,15 +85,15 @@ Update `manifest.json`:
     "name": "LogoSwap",
     "description": "Swap the default Jellyfin logo with your own custom branding.",
     "overview": "Upload a custom logo to replace Jellyfin branding throughout the interface.",
-    "owner": "NewsGuyTor",
+    "owner": "007hacky007",
     "category": "General",
-    "imageUrl": "https://raw.githubusercontent.com/NewsGuyTor/LogoSwap/main/static/icon.png",
+    "imageUrl": "https://raw.githubusercontent.com/007hacky007/LogoSwap/main/static/icon.png",
     "versions": [
       {
         "version": "1.2.0.0",
         "changelog": "New feature: Added awesome thing",
         "targetAbi": "12.0.0.0",
-        "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/1.2.0/LogoSwap_1.2.0_jf12.0.zip",
+        "sourceUrl": "https://github.com/007hacky007/LogoSwap/releases/download/v1.2.0/LogoSwap_1.2.0_jf12.0.zip",
         "checksum": "abc123def456...",
         "timestamp": "2025-11-25T12:00:00Z"
       },
@@ -101,7 +101,7 @@ Update `manifest.json`:
         "version": "1.2.0.0",
         "changelog": "New feature: Added awesome thing",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/NewsGuyTor/LogoSwap/releases/download/1.2.0/LogoSwap_1.2.0_jf10.11.zip",
+        "sourceUrl": "https://github.com/007hacky007/LogoSwap/releases/download/v1.2.0/LogoSwap_1.2.0_jf10.11.zip",
         "checksum": "def456abc123...",
         "timestamp": "2025-11-25T12:00:00Z"
       },
