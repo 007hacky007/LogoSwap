@@ -80,6 +80,39 @@
                         </div>
                     </div>
 
+                    <div class="verticalSection">
+                        <div class="sectionTitleContainer">
+                            <h3 class="sectionTitle">Custom Favicon (Optional)</h3>
+                        </div>
+                        <div class="fieldDescription">
+                            Replace the Jellyfin icon in browser tabs and bookmarks. PNG, SVG and ICO are accepted, up to 512 KiB.
+                            A PNG also becomes the iOS home screen icon, so use a square one of at least 180x180 pixels.
+                        </div>
+                        <div class="fieldDescription" style="margin-top: 0.5em; color: #888; font-size: 0.85em;">
+                            <span>ℹ Takes effect on the next page load. There is no Apply step.</span>
+                        </div>
+
+                        <div class="inputContainer" style="margin-top: 1em;">
+                            <input type="file" id="faviconFile" accept="image/png,image/svg+xml,image/x-icon,.png,.svg,.ico" style="display: none;" />
+                            <button type="button" id="selectFaviconBtn" is="emby-button" class="raised button-submit block">
+                                <span>Select Favicon Image (PNG, SVG, ICO)</span>
+                            </button>
+                        </div>
+
+                        <div id="currentFaviconSection" style="display: none;">
+                            <div style="background: #1a1a1a; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 1em;">
+                                <img id="currentFaviconPreview" src="" alt="Current Favicon" style="width: 64px; height: 64px; object-fit: contain;" />
+                            </div>
+                            <button type="button" id="deleteFaviconBtn" is="emby-button" class="raised button-cancel block">
+                                <span>Delete Favicon (Restore Default)</span>
+                            </button>
+                        </div>
+
+                        <div id="faviconStatus" class="fieldDescription" style="margin-top: 0.5em; padding: 10px; border-radius: 4px; background: #2a2a2a;">
+                            Checking favicon...
+                        </div>
+                    </div>
+
                 </form>
             </div>
         </div>
@@ -122,9 +155,24 @@
                         page.querySelector('#removeBrandingBtn').addEventListener('click', function() {
                             removeBranding(page);
                         });
+
+                        page.querySelector('#selectFaviconBtn').addEventListener('click', function() {
+                            page.querySelector('#faviconFile').click();
+                        });
+
+                        page.querySelector('#faviconFile').addEventListener('change', function(e) {
+                            if (e.target.files[0]) {
+                                uploadFavicon(page, e.target.files[0]);
+                            }
+                        });
+
+                        page.querySelector('#deleteFaviconBtn').addEventListener('click', function() {
+                            deleteFavicon(page);
+                        });
                     }
 
                     checkStatus(page);
+                    checkFaviconStatus(page);
                 }
 
                 // Every request goes through ApiClient.getUrl so it carries the server's
@@ -324,6 +372,69 @@
                         if (!silent) {
                             statusEl.innerHTML = '<span style="color: #ff5722;">✗ Error: ' + err.message + '</span>';
                         }
+                    });
+                }
+
+                function checkFaviconStatus(page) {
+                    var statusEl = page.querySelector('#faviconStatus');
+                    var faviconSection = page.querySelector('#currentFaviconSection');
+                    var previewImg = page.querySelector('#currentFaviconPreview');
+
+                    apiRequest('GET', 'logoswap/favicon/status')
+                    .then(function(text) { return JSON.parse(text); })
+                    .then(function(data) {
+                        if (data.hasFavicon) {
+                            faviconSection.style.display = 'block';
+                            previewImg.src = ApiClient.getUrl('logoswap/favicon/image') + '?t=' + Date.now();
+                            statusEl.innerHTML = '<span style="color: #4caf50;">✓ Custom favicon is active</span><br><small>Reload Jellyfin to see it in the browser tab.</small>';
+                        } else {
+                            faviconSection.style.display = 'none';
+                            statusEl.innerHTML = '<span style="color: #888;">No custom favicon uploaded</span><br><small>The default Jellyfin icon is used.</small>';
+                        }
+                    })
+                    .catch(function(err) {
+                        statusEl.innerHTML = '<span style="color: #ff5722;">Error checking favicon status</span>';
+                    });
+                }
+
+                function uploadFavicon(page, file) {
+                    var statusEl = page.querySelector('#faviconStatus');
+                    var selectBtn = page.querySelector('#selectFaviconBtn');
+
+                    selectBtn.disabled = true;
+                    statusEl.innerHTML = '<span style="color: #2196f3;">Uploading ' + file.name + '...</span>';
+
+                    var formData = new FormData();
+                    formData.append('file', file);
+
+                    apiRequest('POST', 'logoswap/favicon/upload', formData)
+                    .then(function() {
+                        checkFaviconStatus(page);
+                    })
+                    .catch(function(err) {
+                        statusEl.innerHTML = '<span style="color: #ff5722;">✗ Error: ' + err.message + '</span>';
+                    })
+                    .then(function() {
+                        page.querySelector('#faviconFile').value = '';
+                        selectBtn.disabled = false;
+                    });
+                }
+
+                function deleteFavicon(page) {
+                    var statusEl = page.querySelector('#faviconStatus');
+
+                    if (!confirm('Delete the custom favicon and restore the default Jellyfin icon?')) {
+                        return;
+                    }
+
+                    statusEl.innerHTML = '<span style="color: #2196f3;">Deleting...</span>';
+
+                    apiRequest('DELETE', 'logoswap/favicon/delete')
+                    .then(function() {
+                        checkFaviconStatus(page);
+                    })
+                    .catch(function(err) {
+                        statusEl.innerHTML = '<span style="color: #ff5722;">✗ Error: ' + err.message + '</span>';
                     });
                 }
 

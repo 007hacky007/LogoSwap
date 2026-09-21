@@ -19,6 +19,8 @@ Replace the default Jellyfin branding with your own logo across the entire inter
 - **One-Click Activation** - Writes the logo CSS into Jellyfin's branding settings
 - **Live Preview** - See your current logo before applying changes
 - **Easy Removal** - Restore default Jellyfin branding with a single click
+- **Custom Favicon** - Replace the browser tab icon with a PNG, SVG or ICO file
+- **Base URL Support** - Works when Jellyfin runs under a base URL such as `/jellyfin` or behind a reverse proxy path
 
 ---
 
@@ -70,6 +72,13 @@ Your custom logo will now appear across the main Jellyfin interface.
 - **Delete Logo** - Remove your logo and restore default branding
 - **Remove from Branding** - Disable the logo without deleting the file
 
+### 4. Custom Favicon (Optional)
+
+- Click **Select Favicon Image (PNG, SVG, ICO)** and choose a file up to 512 KiB
+- Reload Jellyfin. The new icon shows in the browser tab, with no Apply step
+
+A PNG also replaces the iOS home screen icon, so a square PNG of at least 180x180 pixels gives the best result. **Delete Favicon** restores the Jellyfin icon.
+
 ---
 
 ## API Endpoints
@@ -80,9 +89,13 @@ Your custom logo will now appear across the main Jellyfin interface.
 | `/logoswap/image` | GET | Retrieve the current logo |
 | `/logoswap/delete` | DELETE | Delete the uploaded logo |
 | `/logoswap/status` | GET | Check if a logo is configured |
+| `/logoswap/favicon/upload` | POST | Upload a favicon: PNG, SVG or ICO (multipart/form-data) |
+| `/logoswap/favicon/image` | GET | Retrieve the current favicon |
+| `/logoswap/favicon/delete` | DELETE | Delete the uploaded favicon |
+| `/logoswap/favicon/status` | GET | Check if a favicon is configured |
 
-`upload` and `delete` require an authenticated administrator. `image` is
-anonymous, because the branding CSS fetches it without an auth header.
+The uploads and deletes require an authenticated administrator. The images are
+anonymous, because the branding CSS and the browser fetch them without an auth header.
 
 ---
 
@@ -94,6 +107,11 @@ LogoSwap uses Jellyfin's built-in branding customization system. When you click 
    layout (default since Jellyfin 12) and the Legacy layout
 2. Writes them into Jellyfin's branding Custom CSS setting, between
    `/* LogoSwap CSS */` markers so they can be removed again cleanly
+
+The favicon cannot be reached by branding CSS, because it is a link in the web
+client's `index.html`. While a favicon is uploaded, the plugin rewrites the icon
+links in that page as Jellyfin serves it, pointing them at `/logoswap/favicon/image`.
+Nothing on disk changes, and deleting the favicon restores the original page.
 
 This approach is non-destructive: your original Jellyfin files are never modified.
 
@@ -146,7 +164,15 @@ Not yet. The splash screen that appears when Jellyfin is loading is embedded in 
 
 **Where is my logo stored?**
 
-Your logo is stored in the plugin's data directory within Jellyfin's configuration folder. It's served via the `/logoswap/image` endpoint.
+Your logo and favicon are stored in the plugin's data directory within Jellyfin's configuration folder, so they survive plugin updates. They're served via the `/logoswap/image` and `/logoswap/favicon/image` endpoints.
+
+**The favicon did not change. Why?**
+
+Reload the Jellyfin page once after uploading. The favicon is only replaced when Jellyfin serves its own web client (the default). If you host jellyfin-web separately, the plugin cannot change its `index.html`. Installed web apps (PWA) take their icon from Jellyfin's web manifest, which the plugin does not change.
+
+**My server runs under a base URL. Do I need to re-apply?**
+
+If you applied the logo with an older version, click **Apply Custom Logo to Branding** once more. Older versions wrote an absolute `/logoswap/image` URL that broke under a base URL.
 
 ---
 
