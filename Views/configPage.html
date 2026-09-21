@@ -127,17 +127,36 @@
                     checkStatus(page);
                 }
 
+                // Every request goes through ApiClient.getUrl so it carries the server's
+                // base URL, e.g. /jellyfin/logoswap/status rather than /logoswap/status.
+                function apiRequest(method, path, body) {
+                    return fetch(ApiClient.getUrl(path), {
+                        method: method,
+                        headers: { 'Authorization': 'MediaBrowser Token="' + ApiClient.accessToken() + '"' },
+                        body: body,
+                        credentials: 'include'
+                    })
+                    .then(function(response) {
+                        if (!response.ok) {
+                            return response.text().then(function(text) {
+                                throw new Error(text || method + ' ' + path + ' failed');
+                            });
+                        }
+                        return response.text();
+                    });
+                }
+
                 function checkStatus(page) {
                     var statusEl = page.querySelector('#statusMessage');
                     var logoSection = page.querySelector('#currentLogoSection');
                     var previewImg = page.querySelector('#currentLogoPreview');
 
-                    fetch('/logoswap/status', { credentials: 'include' })
-                    .then(function(response) { return response.json(); })
+                    apiRequest('GET', 'logoswap/status')
+                    .then(function(text) { return JSON.parse(text); })
                     .then(function(data) {
                         if (data.hasLogo) {
                             logoSection.style.display = 'block';
-                            previewImg.src = data.logoUrl + '?t=' + Date.now();
+                            previewImg.src = ApiClient.getUrl('logoswap/image') + '?t=' + Date.now();
                             checkBrandingStatus(page, statusEl);
                         } else {
                             logoSection.style.display = 'none';
@@ -175,20 +194,7 @@
                     var formData = new FormData();
                     formData.append('file', selectedFile);
 
-                    fetch('/logoswap/upload', {
-                        method: 'POST',
-                        headers: { 'Authorization': 'MediaBrowser Token="' + ApiClient.accessToken() + '"' },
-                        body: formData,
-                        credentials: 'include'
-                    })
-                    .then(function(response) {
-                        if (!response.ok) {
-                            return response.text().then(function(text) {
-                                throw new Error(text || 'Upload failed');
-                            });
-                        }
-                        return response.text();
-                    })
+                    apiRequest('POST', 'logoswap/upload', formData)
                     .then(function(result) {
                         statusEl.innerHTML = '<span style="color: #4caf50;">✓ ' + result + '</span>';
                         selectedFile = null;
@@ -214,19 +220,7 @@
 
                     statusEl.innerHTML = '<span style="color: #2196f3;">Deleting...</span>';
 
-                    fetch('/logoswap/delete', {
-                        method: 'DELETE',
-                        headers: { 'Authorization': 'MediaBrowser Token="' + ApiClient.accessToken() + '"' },
-                        credentials: 'include'
-                    })
-                    .then(function(response) {
-                        if (!response.ok) {
-                            return response.text().then(function(text) {
-                                throw new Error(text || 'Delete failed');
-                            });
-                        }
-                        return response.text();
-                    })
+                    apiRequest('DELETE', 'logoswap/delete')
                     .then(function(result) {
                         statusEl.innerHTML = '<span style="color: #4caf50;">✓ ' + result + '</span>';
                         // Also remove from branding
@@ -255,8 +249,10 @@
                             }
                         }
 
-                        // Add CSS injection for logo replacement
-                        var logoUrl = '/logoswap/image?v=' + Date.now();
+                        // Add CSS injection for logo replacement. The URL is relative: branding
+                        // CSS is an inline <style> on the web client's /web/ page, so it
+                        // resolves under a base URL or a reverse proxy prefix alike.
+                        var logoUrl = '../logoswap/image?v=' + Date.now();
                         var cssInjection = CSS_MARKER + '\n' +
                             '/* Legacy layout: the header logo is a background-image. */\n' +
                             '.pageTitleWithLogo, .pageTitleWithDefaultLogo {\n' +

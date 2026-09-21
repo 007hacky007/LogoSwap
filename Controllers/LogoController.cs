@@ -208,6 +208,6 @@ public class LogoController : ControllerBase
         var logoPath = Plugin.Instance?.Configuration.LogoPath;
         var hasLogo = !string.IsNullOrEmpty(logoPath) && System.IO.File.Exists(logoPath);
         
-        return Ok(new { hasLogo, logoUrl = hasLogo ? "/logoswap/image" : null });
+        return Ok(new { hasLogo, logoUrl = hasLogo ? Request.PathBase + "/logoswap/image" : null });
     }
 }
